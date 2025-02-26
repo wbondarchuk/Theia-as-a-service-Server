@@ -2,7 +2,6 @@ from os.path import exists
 from configparser import ConfigParser
 from os import urandom
 
-
 ### SECRET KEY
 
 SECRET_KEY_FILE = 'secret_key'

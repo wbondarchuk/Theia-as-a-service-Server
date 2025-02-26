@@ -2,7 +2,7 @@ from subprocess import Popen, PIPE
 from flask import current_app
 from flask_login import current_user
 
-from .models import Containers
+from .models import Container
 from . import db
 from project.config import HOST, DOCKER_IMAGE, DOCKER_NEW_CLIENT_OUTPUT_SUBSTR, DOCKER_CLIENT_EXITED_OUTPUT_SUBSTR, DOCKER_EXPOSED_PORT
 
@@ -22,11 +22,11 @@ def start_container(id):
 
 # создаёт контейнер RIDE и добавляет в БД, возвращает id
 def create_container():
-    id = run_cmd(f'docker create --ip={HOST} --publish 3000 {DOCKER_IMAGE}')[:12]
+    id = run_cmd(f'docker create --publish 3000 {DOCKER_IMAGE}')[:12]
     name = run_cmd('docker ps -a --filter "id=' + id + '" --format "{{.Names}}"')[:-1]
     current_app.logger.info(f'Created container {name} ({id})')
     
-    new_container = Containers(id=id, user_id=current_user.id, container_name=name)
+    new_container = Container(id=id, user_id=current_user.id, container_name=name)
     db.session.add(new_container)
     db.session.commit()
     current_app.logger.info(f'Added new container {new_container.container_name} ({new_container.id}) to DB')
@@ -46,7 +46,7 @@ def force_remove_container(id):
     result = run_cmd(f'docker rm -f {id}')[:-1]
     current_app.logger.info(f'Force removed container: {result}')
     
-    Containers.query.filter_by(id=id).delete()
+    Container.query.filter_by(id=id).delete()
     db.session.commit()
     current_app.logger.info(f'Deleted container {id} from DB')
     
@@ -60,7 +60,7 @@ def number_of_log_lines(container, substr):
     try:
         return int(result)
     except ValueError:
-    	raise Exception(f'"wc -l" returned: {result}')
+        raise Exception(f'"wc -l" returned: {result}')
 
 
 # возвращает список айднишников контейнеров
@@ -83,8 +83,8 @@ def stop_containers(stop_all = False):
 
 
 # возвращает назначенный контейнеру порт (None, если такой контейнер не запущен)
-def get_container_port(id):
-    result = run_cmd(f'docker port {id[:12]} {DOCKER_EXPOSED_PORT}')
+def get_container_port(container_id):
+    result = run_cmd(f'docker port {container_id[:12]} {DOCKER_EXPOSED_PORT}')
     try:
         return int(result.splitlines()[0][8:])
     except ValueError:
@@ -92,8 +92,24 @@ def get_container_port(id):
         return None
 
 
-def get_URL(id):
-    port = get_container_port(id)
+def get_URL(container_id, username):
+    port = get_container_port(container_id)
+    # update_nginx_config(current_user.name, port)
+    # URL = f'http://{HOST}/{username}'
     URL = f'http://{HOST}:{port}'
     return URL
+
+def update_nginx_config(username, port):
+    config = f"""
+    location /{username}/ {{
+        proxy_pass http://{HOST}:{port}/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }}
+    """
+    with open("/etc/nginx/conf.d/containers.conf", "a") as f:
+        f.write(config)
+    run_cmd("nginx -s reload")
 
