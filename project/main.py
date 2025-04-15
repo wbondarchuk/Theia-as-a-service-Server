@@ -1,6 +1,6 @@
 # main.py
 
-from flask import Blueprint, render_template, request, session, current_app, flash
+from flask import Blueprint, render_template, request, session, current_app, flash, url_for, redirect
 from flask_login import current_user, login_required
 
 from .docker_manager import create_container, force_remove_container, get_URL, start_container
@@ -9,16 +9,6 @@ from .models import User, Container
 from .config import DOCKER_WAIT_TIME_IN_SECONDS
 
 main = Blueprint('main', __name__)
-
-
-@main.route('/')
-def index():
-    return render_template('index.html')
-
-
-@main.route('/help')
-def help():
-    return render_template('help.html')
 
 
 @main.route('/profile', methods=['GET', 'POST'])
@@ -39,7 +29,10 @@ def profile():
                 current_app.logger.info(f'Renamed container id={container.id}: old name "{old_name}", new name "{container.container_name}"')
 
         elif 'create_btn' in request.form:
-            create_container()
+            try:
+                container_id = create_container()
+            except Exception as e:
+                flash(str(e), 'danger')
 
         elif 'delete_btn' in request.form:
             for id in data:

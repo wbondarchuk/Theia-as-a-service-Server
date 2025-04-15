@@ -1,11 +1,11 @@
 from subprocess import Popen, PIPE
 from flask import current_app
 from flask_login import current_user
-
+import socket
+from contextlib import closing
 from .models import Container
 from . import db
-from project.config import HOST, DOCKER_IMAGE, DOCKER_NEW_CLIENT_OUTPUT_SUBSTR, DOCKER_CLIENT_EXITED_OUTPUT_SUBSTR, DOCKER_EXPOSED_PORT
-
+from project.config import HOST, DOCKER_IMAGE, DOCKER_NEW_CLIENT_OUTPUT_SUBSTR, DOCKER_CLIENT_EXITED_OUTPUT_SUBSTR, DOCKER_EXPOSED_PORT, MIN_PORT, MAX_PORT
 
 # запускает команду в shell и возвращает вывод
 def run_cmd(cmd):
@@ -15,23 +15,58 @@ def run_cmd(cmd):
 
 # запускает контейнер на случайном порту и возвращает вывод
 def start_container(id):
+    """Запускает контейнер на предопределённом порту (без проверки доступности порта)"""
     result = run_cmd(f'docker start {id}')
     current_app.logger.info(f'Started container {result[:-1]}')
     return result
 
 
-# создаёт контейнер RIDE и добавляет в БД, возвращает id
 def create_container():
-    id = run_cmd(f'docker create --publish 3000 {DOCKER_IMAGE}')[:12]
-    name = run_cmd('docker ps -a --filter "id=' + id + '" --format "{{.Names}}"')[:-1]
-    current_app.logger.info(f'Created container {name} ({id})')
-    
-    new_container = Container(id=id, user_id=current_user.id, container_name=name)
-    db.session.add(new_container)
-    db.session.commit()
-    current_app.logger.info(f'Added new container {new_container.container_name} ({new_container.id}) to DB')
-    
-    return id
+    """Создаёт контейнер на следующем доступном порту из диапазона"""
+    try:
+        port = find_available_port()
+        id = run_cmd(f'docker create --publish {port}:{DOCKER_EXPOSED_PORT} {DOCKER_IMAGE}')[:12]
+        name = run_cmd('docker ps -a --filter "id=' + id + '" --format "{{.Names}}"')[:-1]
+
+        new_container = Container(
+            id=id,
+            user_id=current_user.id,
+            container_name=name,
+            port=port
+        )
+        db.session.add(new_container)
+        db.session.commit()
+
+        current_app.logger.info(f'Created container {name} ({id}) on port {port}')
+        return id
+    except Exception as e:
+        db.session.rollback()
+        raise Exception("No available ports in the specified range. Please try again later.")
+
+
+def get_URL(container_id, username):
+    """Возвращает URL контейнера на основе сохранённого порта"""
+    container = Container.query.get_or_404(container_id)
+    return f'http://{HOST}:{container.port}'
+
+
+def get_container_port(container_id):
+    """Возвращает порт контейнера из БД (больше не используем docker port)"""
+    container = Container.query.get_or_404(container_id)
+    return container.port
+
+def is_port_available(port):
+    """Проверяет, свободен ли порт"""
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+        return sock.connect_ex((HOST, port)) != 0
+
+
+def find_available_port():
+    """Находит свободный порт в заданном диапазоне"""
+    for port in range(MIN_PORT, MAX_PORT + 1):
+        if is_port_available(port):
+            return port
+    raise Exception("No available ports in the specified range")
 
 
 # останавливает контейнер и возвращает вывод команды
@@ -81,23 +116,6 @@ def stop_containers(stop_all = False):
         if to_stop:
             stop_container(container)
 
-
-# возвращает назначенный контейнеру порт (None, если такой контейнер не запущен)
-def get_container_port(container_id):
-    result = run_cmd(f'docker port {container_id[:12]} {DOCKER_EXPOSED_PORT}')
-    try:
-        return int(result.splitlines()[0][8:])
-    except ValueError:
-        current_app.logger.error(f'docker port returned: {result[:-1]}')
-        return None
-
-
-def get_URL(container_id, username):
-    port = get_container_port(container_id)
-    # update_nginx_config(current_user.name, port)
-    # URL = f'http://{HOST}/{username}'
-    URL = f'http://{HOST}:{port}'
-    return URL
 
 def update_nginx_config(username, port):
     config = f"""

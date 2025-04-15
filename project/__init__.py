@@ -1,55 +1,68 @@
-from os.path import exists, join
-from pathlib import Path
-from os import environ
+import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
-from logging import INFO
-from .config import SECRET_KEY
+from werkzeug.security import generate_password_hash
+from os import environ
+from .config import config, SECRET_KEY  # Берём SECRET_KEY из config.py
 
-# init SQLAlchemy so we can use it later in our models
+# Инициализация SQLAlchemy
 db = SQLAlchemy()
-
 
 def create_app():
     app = Flask(__name__)
 
-    app.logger.setLevel(INFO)
-
-    app.config['SECRET_KEY'] = SECRET_KEY
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
+    # Настройки приложения
+    app.config['SECRET_KEY'] = SECRET_KEY  # Используем SECRET_KEY из файла
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite?mode=rwc'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['SQLALCHEMY_ECHO'] = environ.get('SQLALCHEMY_ECHO') in ('1', 'True')
 
     db.init_app(app)
 
+    from .models import User, Role
+
+    # Настройки Flask-Login
     login_manager = LoginManager()
     login_manager.login_view = 'auth.login'
     login_manager.init_app(app)
 
-    environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
-
-    from .models import User
-
     @login_manager.user_loader
     def load_user(user_id):
-        # since the user_id is just the primary key of our user table, use it in the query for the user
         return User.query.get(int(user_id))
 
-    # blueprint for auth routes in our app
+    # Разрешаем OAuth в небезопасном режиме (если нужно)
+    environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+
+    # Подключаем Blueprint'ы
     from .auth import auth as auth_blueprint
     app.register_blueprint(auth_blueprint)
 
-    # blueprint for non-auth parts of app
+    from .admin import admin as admin_blueprint
+    app.register_blueprint(admin_blueprint)
+
     from .main import main as main_blueprint
     app.register_blueprint(main_blueprint)
 
-    if not exists(join(Path(__file__).parent, "db.sqlite")):
-        app.logger.info('Database not found, creating new database...')
-        with app.app_context():
+    # Создание БД и базового администратора
+    with app.app_context():
+        if not os.path.exists("db.sqlite"):
             db.create_all()
+            app.logger.info("Database created.")
+
+            # Читаем данные администратора из config.ini
+            admin_email = config['ADMIN']['email']
+            admin_name = config['ADMIN']['name']
+            admin_password = config['ADMIN']['password']
+
+            if not User.query.filter_by(email=admin_email).first():
+                hashed_password = generate_password_hash(admin_password)
+                admin = User(email=admin_email, name=admin_name, password=hashed_password, role=Role.ADMIN)
+                db.session.add(admin)
+                db.session.commit()
+                app.logger.info(f"Admin user {admin_email} created.")
 
     return app
 
-
+# Создаём приложение
 app = create_app()

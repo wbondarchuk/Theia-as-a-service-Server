@@ -1,53 +1,85 @@
-<!-- templates/profile.html -->
-
 {% extends "base.html" %}
 
 {% block content %}
-<h1 class="title">
-    Welcome, {{ name }}!
-</h1>
-<h2 class="subtitle">
-    If you need help, visit the appropriate section!
-</h2>
-<form method="POST" action="/profile">
+<div class="container">
+    <div class="columns is-centered">
+        <div class="column is-10">
+            <div class="card">
+                <div class="card-content">
+                    <h1 class="title is-3 has-text-centered">
+                        <i class="fas fa-user-circle mr-3"></i>Welcome, {{ name }}!
+                    </h1>
 
-    <table>
-        <tr>
-            <td><label>Check</label></td>
-            <td><label>Container Name</label></td>
-            <td><label>Container ID</label></td>
-        </tr>
-        {% for c in list %}
+                    {% with messages = get_flashed_messages() %}
+                        {% if messages %}
+                            <div class="notification is-danger is-light">
+                                <button class="delete"></button>
+                                {{ messages[0] }}
+                            </div>
+                            {% if messages|length > 1 %}
+                            <div class="notification is-link is-light">
+                                <button class="delete"></button>
+                                {{ messages[1] }}
+                            </div>
+                            {% endif %}
+                        {% endif %}
+                    {% endwith %}
 
-        <tr>
-            <td><input type="checkbox" value="{{c.id}}" name="chkbox"></td>
-            <td><input class="input is-small" type="text" name="cont_name{{c.id}}" value="{{c.container_name}}" autofocus=""></td>
-            <td><label>{{c.id}}</label></td>
-        </tr>
+                    <form method="POST" action="{{ url_for('main.profile') }}">
+                        <div class="table-container">
+                            <table class="table is-fullwidth is-hoverable">
+                                <thead>
+                                    <tr>
+                                        <th>Select</th>
+                                        <th>Container Name</th>
+                                        <th>Container ID</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for c in list %}
+                                    <tr>
+                                        <td>
+                                            <label class="checkbox">
+                                                <input type="checkbox" value="{{ c.id }}" name="chkbox">
+                                            </label>
+                                        </td>
+                                        <td>
+                                            <div class="field">
+                                                <div class="control">
+                                                    <input class="input is-small" type="text"
+                                                           name="cont_name{{ c.id }}"
+                                                           value="{{ c.container_name }}">
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>{{ c.id }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
 
-        {% endfor %}
-    </table>
-    <div class="column is-5 is-offset-4">
-        <div class="buttons">
-            <input type="submit" class="button is-info" name="rename_btn" value="Rename">
-            <input type="submit" class="button is-success" name="create_btn" value="Create">
-            <input type="submit" class="button is-link" name="share_btn" value="Share">
-            <input type="submit" class="button is-danger" name="delete_btn" value="Delete">
-            <input type="submit" class="button is-warning" name="run_btn" value="Run">
+                        <div class="buttons is-centered">
+                            <button type="submit" name="rename_btn" class="button is-info">
+                                <i class="fas fa-edit mr-2"></i> Rename
+                            </button>
+                            <button type="submit" name="create_btn" class="button is-success">
+                                <i class="fas fa-plus mr-2"></i> Create
+                            </button>
+                            <button type="submit" name="share_btn" class="button is-link">
+                                <i class="fas fa-share-alt mr-2"></i> Share
+                            </button>
+                            <button type="submit" name="delete_btn" class="button is-danger">
+                                <i class="fas fa-trash-alt mr-2"></i> Delete
+                            </button>
+                            <button type="submit" name="run_btn" class="button is-warning">
+                                <i class="fas fa-play mr-2"></i> Run
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
-
-</form>
-
-{% with messages = get_flashed_messages() %}
-{% if messages %}
-<div class="notification is-danger">
-    {{ messages[0] }}
 </div>
-<div class="notification is-link">
-    {{ messages[1] }}
-</div>
-{% endif %}
-{% endwith %}
-
 {% endblock %}
