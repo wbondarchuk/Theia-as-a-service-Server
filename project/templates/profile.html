@@ -6,10 +6,9 @@
         <div class="column is-10">
             <div class="card">
                 <div class="card-content">
-                    <h1 class="title is-3 has-text-centered">
-                        <i class="fas fa-user-circle mr-3"></i>Welcome, {{ name }}!
-                    </h1>
-
+                     <div class="notification is-primary is-light">
+                        Welcome, {{ name }}!
+                    </div>
                     {% with messages = get_flashed_messages() %}
                         {% if messages %}
                             <div class="notification is-danger is-light">
