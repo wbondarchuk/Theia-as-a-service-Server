@@ -31,16 +31,15 @@ def create_container():
 
         new_container = Container(
             id=id,
-            user_id=current_user.id,
             container_name=name,
             port=port
         )
+
         db.session.add(new_container)
         db.session.commit()
 
-        username = current_user.name
         # Создаем конфиг Nginx
-        create_nginx_config(username, name, port)
+        create_nginx_config(name, port)
 
         current_app.logger.info(f'Created container {name} ({id}) on port {port}')
         return id
@@ -49,10 +48,10 @@ def create_container():
         raise Exception("No available ports in the specified range. Please try again later.")
 
 
-def create_nginx_config(username, container_name, port):
+def create_nginx_config(container_name, port):
     """Создаёт конфигурацию Nginx с учётом имени пользователя"""
     config = f"""
-    location /{username}/{container_name}/ {{
+    location /{container_name}/ {{
         proxy_pass http://{HOST}:{port}/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -66,7 +65,7 @@ def create_nginx_config(username, container_name, port):
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
 
-        rewrite ^/{username}/{container_name}/(.*)$ /$1 break;
+        rewrite ^/{container_name}/(.*)$ /$1 break;
     }}
     """
 
@@ -74,7 +73,7 @@ def create_nginx_config(username, container_name, port):
     os.makedirs('/etc/nginx/containers', exist_ok=True)
 
     # Записываем конфиг в отдельный файл
-    config_path = f'/etc/nginx/containers/{username}_{container_name}.conf'
+    config_path = f'/etc/nginx/containers/{container_name}.conf'
     with open(config_path, 'w') as f:
         f.write(config)
 
@@ -88,9 +87,9 @@ def create_nginx_config(username, container_name, port):
         raise Exception(f"Nginx reload failed: {str(e)}")
 
 def get_URL(container_id, username):
-    """Возвращает URL в формате /username/container_name"""
+    """Возвращает URL в формате /container_name"""
     container = Container.query.get_or_404(container_id)
-    return f'http://{HOST}/{username}/{container.container_name}/'
+    return f'http://{HOST}/{container.container_name}/'
 
 def is_port_available(port):
     """Проверяет, свободен ли порт"""
