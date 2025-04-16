@@ -16,7 +16,7 @@
     sudo apt install pip
     sudo pip install -r requirements.txt
 
-# Настройка Google
+# Настройка Google (НЕ РАБОТАЕТ)
 
 Для работы Google авторизации необходимо настроить проект в [console.cloud.google.com](console.cloud.google.com).
 
