@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 
 {% block content %}
+<!-- Мета-редирект -->
+<meta http-equiv="refresh" content="{{ delay }};url={{ redirect_url }}">
 <div class="loader-container">
     <div class="loader"></div>
     <h2 class="title is-4 mt-5 has-text-white">
