@@ -1,6 +1,6 @@
 import os
 from subprocess import Popen, PIPE
-from flask import current_app
+from flask import current_app, url_for
 from flask_login import current_user
 import socket
 from contextlib import closing
@@ -51,22 +51,26 @@ def create_container():
 def create_nginx_config(container_name, port):
     """Создаёт конфигурацию Nginx с учётом имени пользователя"""
     config = f"""
-    location /{container_name}/ {{
-        proxy_pass http://{HOST}:{port}/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+       location /proxy/{container_name}/ {{
+           # Проверка наличия cookie с сессией пользователя
+            if ($http_cookie !~* "session=") {{
+                return 403;
+            }}
+           proxy_pass http://{HOST}:{port}/;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
 
-        proxy_redirect off;
-        proxy_buffering off;
+           proxy_redirect off;
+           proxy_buffering off;
 
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
+           proxy_http_version 1.1;
+           proxy_set_header Upgrade $http_upgrade;
+           proxy_set_header Connection "upgrade";
 
-        rewrite ^/{container_name}/(.*)$ /$1 break;
-    }}
+           rewrite ^/proxy/{container_name}/(.*)$ /$1 break;
+       }}
     """
 
     # Создаем директорию для конфигов, если её нет
@@ -87,9 +91,9 @@ def create_nginx_config(container_name, port):
         raise Exception(f"Nginx reload failed: {str(e)}")
 
 def get_URL(container_id, username):
-    """Возвращает URL в формате /container_name"""
+    """Возвращает URL для Flask-роута /access/<container_name>"""
     container = Container.query.get_or_404(container_id)
-    return f'http://{HOST}/{container.container_name}/'
+    return url_for('main.access_container', container_name=container.container_name)
 
 def is_port_available(port):
     """Проверяет, свободен ли порт"""

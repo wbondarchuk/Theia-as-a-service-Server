@@ -6,7 +6,7 @@ from flask_login import current_user, login_required
 from .docker_manager import create_container, force_remove_container, get_URL, start_container
 from . import db
 from .models import User, Container, UserContainer
-from .config import DOCKER_WAIT_TIME_IN_SECONDS
+from .config import DOCKER_WAIT_TIME_IN_SECONDS, HOST
 
 main = Blueprint('main', __name__)
 
@@ -26,7 +26,7 @@ def profile():
             # Если контейнер найден, запускаем его
             start_container(container_id)
             URL = get_URL(container_id, username)
-            return render_template('loader.html'), {"Refresh": f"{DOCKER_WAIT_TIME_IN_SECONDS}; url={URL}"}
+            return render_template('loader.html', redirect_url=URL, delay=DOCKER_WAIT_TIME_IN_SECONDS)
 
     # Получаем контейнеры пользователя через таблицу UserContainer
     containers = [uc.container for uc in current_user.container_links]
@@ -34,3 +34,18 @@ def profile():
     return render_template('profile.html',
                            name=username,
                            list=containers)
+
+@main.route('/access/<container_name>')
+@login_required
+def access_container(container_name):
+    current_app.logger.info(f"Access request for container: {container_name} from user: {current_user.name}")
+    container = Container.query.filter_by(container_name=container_name).first_or_404()
+
+    # Проверяем, есть ли у пользователя доступ к контейнеру
+    link = UserContainer.query.filter_by(user_id=current_user.id, container_id=container.id).first()
+    if not link:
+        flash("Access denied", "danger")
+        return redirect(url_for('main.profile'))
+
+    proxy_url = f"http://{HOST}/proxy/{container.container_name}/"
+    return redirect(proxy_url)
