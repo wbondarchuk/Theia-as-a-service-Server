@@ -6,10 +6,9 @@
         <div class="column is-10">
             <div class="card">
                 <div class="card-content">
-                    <h1 class="title is-3 has-text-centered">
-                        <i class="fas fa-user-circle mr-3"></i>Welcome, {{ name }}!
-                    </h1>
-
+                    <div class="notification is-primary is-light">
+                        Welcome, {{ name }}!
+                    </div>
                     {% with messages = get_flashed_messages() %}
                         {% if messages %}
                             <div class="notification is-danger is-light">
@@ -25,58 +24,35 @@
                         {% endif %}
                     {% endwith %}
 
-                    <form method="POST" action="{{ url_for('main.profile') }}">
-                        <div class="table-container">
-                            <table class="table is-fullwidth is-hoverable">
-                                <thead>
-                                    <tr>
-                                        <th>Select</th>
-                                        <th>Container Name</th>
-                                        <th>Container ID</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for c in list %}
-                                    <tr>
-                                        <td>
-                                            <label class="checkbox">
-                                                <input type="checkbox" value="{{ c.id }}" name="chkbox">
-                                            </label>
-                                        </td>
-                                        <td>
-                                            <div class="field">
-                                                <div class="control">
-                                                    <input class="input is-small" type="text"
-                                                           name="cont_name{{ c.id }}"
-                                                           value="{{ c.container_name }}">
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>{{ c.id }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="buttons is-centered">
-                            <button type="submit" name="rename_btn" class="button is-info">
-                                <i class="fas fa-edit mr-2"></i> Rename
-                            </button>
-                            <button type="submit" name="create_btn" class="button is-success">
-                                <i class="fas fa-plus mr-2"></i> Create
-                            </button>
-                            <button type="submit" name="share_btn" class="button is-link">
-                                <i class="fas fa-share-alt mr-2"></i> Share
-                            </button>
-                            <button type="submit" name="delete_btn" class="button is-danger">
-                                <i class="fas fa-trash-alt mr-2"></i> Delete
-                            </button>
-                            <button type="submit" name="run_btn" class="button is-warning">
-                                <i class="fas fa-play mr-2"></i> Run
-                            </button>
-                        </div>
-                    </form>
+                    <div class="table-container">
+                        <table class="table is-fullwidth is-hoverable">
+                            <thead>
+                                <tr>
+                                    <th>Container ID</th>
+                                    <th>Container Name</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for c in list %}
+                                <tr>
+                                    <td>{{ c.id }}</td>
+                                    <td>{{ c.container_name }}</td>
+                                    <td>
+                                        <form method="POST" action="{{ url_for('main.profile') }}">
+                                            <input type="hidden" name="container_id" value="{{ c.id }}">
+                                            <button type="submit" name="run_btn" class="button is-small is-success" title="Run Container">
+                                                <span class="icon">
+                                                    <i class="fas fa-play"></i>
+                                                </span>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
