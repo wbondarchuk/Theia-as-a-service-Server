@@ -1,8 +1,8 @@
-from flask import Blueprint, render_template, request, redirect, url_for, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, current_app, flash, jsonify
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
-from .models import User, Role, Container, db, ContainerRole, UserContainer
-from .docker_manager import create_container as create, force_remove_container, get_URL, start_container
+from .models import User, Role, Container, db, ContainerRole, UserContainer, ContainerType
+from .docker_manager import create_container as create, force_remove_container, start_container, create_guest_container, rename_container as rename
 
 admin = Blueprint('admin', __name__)
 
@@ -99,21 +99,62 @@ def container_management():
                          active_tab='containers')
 
 
-@admin.route('/admin/containers/create', methods=['POST'])
+@admin.route('/admin/containers/create', methods=['GET', 'POST'])
 @login_required
 def create_container():
     if current_user.role != Role.ADMIN:
         current_app.logger.info(f'Access denied!')
         return redirect(url_for("main.profile"))
 
-    try:
-        # Создаем контейнер без привязки к пользователю
-        container_id = create()
-        current_app.logger.info(f'Container created successfully!')
-    except Exception as e:
-        current_app.logger.info(str(e), 'danger')
+    if request.method == 'GET':
+        users = User.query.all()
+        return render_template('create_container.html', users=users)
+
+    if request.method == 'POST':
+        try:
+            container_name = request.form.get('container_name')
+            if not container_name:
+                flash('Container name is required', 'danger')
+                return redirect(url_for('admin.create_container'))
+
+            # Проверяем, что имя контейнера уникальное
+            if Container.query.filter_by(container_name=container_name).first():
+                flash('Container with this name already exists', 'danger')
+                return redirect(url_for('admin.create_container'))
+            container_id = create(container_name)
+
+            current_app.logger.info(f'Created container {container_name} {container_id}')
+        except Exception as e:
+            flash(str(e), 'danger')
+            return redirect(url_for('admin.create_container'))
 
     return redirect(url_for('admin.container_management'))
+
+
+@admin.route('/admin/containers/rename/<container_id>', methods=['POST'])
+@login_required
+def rename_container(container_id):
+    if current_user.role != Role.ADMIN:
+        return jsonify({'success': False, 'message': 'Access denied'}), 403
+
+    try:
+        data = request.get_json()
+        new_name = data.get('name')
+
+        if not new_name:
+            return jsonify({'success': False, 'message': 'Name is required'}), 400
+
+            # Проверяем, что новое имя уникальное
+        if Container.query.filter(Container.id != container_id, Container.container_name == new_name).first():
+            return jsonify({'success': False, 'message': 'Container with this name already exists'}), 400
+
+        container = Container.query.get_or_404(container_id)
+        rename(container, new_name)
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f'Error renaming container: {str(e)}')
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 @admin.route('/admin/containers/manage_users/<container_id>', methods=['GET', 'POST'])
@@ -162,4 +203,20 @@ def delete_container(container_id):
 
     force_remove_container(container_id)
     current_app.logger.info("Container deleted successfully!")
+    return redirect(url_for('admin.container_management'))
+
+
+@admin.route('/admin/containers/reset_guest', methods=['POST'])
+@login_required
+def reset_guest_container():
+    if current_user.role != Role.ADMIN:
+        current_app.logger.info(f'Access denied!')
+        return redirect(url_for("main.profile"))
+
+    guest = Container.query.filter_by(container_type=ContainerType.GUEST).first()
+
+    force_remove_container(guest.id)
+    create_guest_container()
+    container = Container.query.filter_by(container_type=ContainerType.GUEST).first_or_404()
+    start_container(container.id)
     return redirect(url_for('admin.container_management'))

@@ -23,6 +23,7 @@ HOST = config['NETWORK']['host']
 PORT = int(config['NETWORK']['port'])
 MIN_PORT = int(config['NETWORK']['min_port'])
 MAX_PORT = int(config['NETWORK']['max_port'])
+GUEST_PORT = int(config['NETWORK']['guest_port'])
 
 DOCKER_IMAGE = config['DOCKER']['image']
 DOCKER_EXPOSED_PORT = int(config['DOCKER']['exposed_port'])

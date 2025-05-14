@@ -20,7 +20,7 @@ def create_app():
 
     db.init_app(app)
 
-    from .models import User, Role
+    from .models import User, Role, Container, ContainerType
 
     # Настройки Flask-Login
     login_manager = LoginManager()
@@ -49,6 +49,15 @@ def create_app():
         if not os.path.exists("db.sqlite"):
             db.create_all()
             app.logger.info("Database created.")
+
+            # Создаем гостевой контейнер
+            if not Container.query.filter_by(container_type=ContainerType.GUEST).first():
+                try:
+                    from .docker_manager import create_guest_container
+                    create_guest_container()
+                    app.logger.info("Guest container created.")
+                except Exception as e:
+                    app.logger.error(f"Failed to create guest container: {str(e)}")
 
             # Читаем данные администратора из config.ini
             admin_email = config['ADMIN']['email']

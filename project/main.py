@@ -5,7 +5,7 @@ from flask_login import current_user, login_required
 
 from .docker_manager import create_container, force_remove_container, get_URL, start_container
 from . import db
-from .models import User, Container, UserContainer
+from .models import ContainerType, Container, UserContainer
 from .config import DOCKER_WAIT_TIME_IN_SECONDS, HOST
 
 main = Blueprint('main', __name__)
@@ -43,9 +43,21 @@ def access_container(container_name):
 
     # Проверяем, есть ли у пользователя доступ к контейнеру
     link = UserContainer.query.filter_by(user_id=current_user.id, container_id=container.id).first()
+    current_app.logger.info(f"Acc {current_user.id} {container.id}")
     if not link:
         flash("Access denied", "danger")
         return redirect(url_for('main.profile'))
 
     proxy_url = f"http://{HOST}/proxy/{container.container_name}/"
+    current_app.logger.info(f"{proxy_url}")
+    return redirect(proxy_url)
+
+
+@main.route('/access/guest-container')
+def guest_access():
+    """Специальный маршрут для гостевого доступа без аутентификации"""
+    container = Container.query.filter_by(container_type=ContainerType.GUEST).first_or_404()
+    start_container(container.id)
+    proxy_url = f"http://{HOST}/{container.container_name}/"
+    current_app.logger.info(f"{proxy_url}")
     return redirect(proxy_url)
