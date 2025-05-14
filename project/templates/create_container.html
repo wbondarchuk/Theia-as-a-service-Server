@@ -11,17 +11,11 @@
 
                 <form method="POST">
                     <div class="field">
-                        <label class="label">Owner</label>
+                        <label class="label">Container Name</label>
                         <div class="control has-icons-left">
-                            <div class="select is-fullwidth">
-                                <select name="user_id" required>
-                                    {% for user in users %}
-                                    <option value="{{ user.id }}">{{ user.email }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
+                            <input class="input" type="text" name="container_name" placeholder="Enter container name" required>
                             <span class="icon is-small is-left">
-                                <i class="fas fa-user"></i>
+                                <i class="fas fa-server"></i>
                             </span>
                         </div>
                     </div>
